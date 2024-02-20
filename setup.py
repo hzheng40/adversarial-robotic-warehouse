@@ -18,9 +18,10 @@ setup(
     ],
     install_requires=[
         "numpy",
-        "gym>=0.15",
-        "pyglet",
+        "gym==0.21",
+        "pyglet==1.5.27",
         "networkx",
+        "six"
     ],
     extras_require={"test": ["pytest"]},
     include_package_data=True,

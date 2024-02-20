@@ -142,6 +142,7 @@ class Warehouse(gym.Env):
         max_steps: Optional[int],
         reward_type: RewardType,
         fast_obs=True,
+        layout=None,
     ):
         """The robotic warehouse environment
 
