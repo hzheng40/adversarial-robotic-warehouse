@@ -403,7 +403,7 @@ class Warehouse(gym.Env):
                     obs.skip(2)
                 else:
                     obs.write(
-                        [1.0, int(self.shelfs[id_shelf - 1] in self.request_queue)]
+                        [1.0, int(self.shelfs[id_shelf - 1] == self.request_queue[id_agent])]
                     )
 
             return obs.vector
@@ -623,15 +623,19 @@ class Warehouse(gym.Env):
                 continue
             shelf = self.shelfs[shelf_id - 1]
 
-            if shelf not in self.request_queue:
+            if shelf not in self.request_queue or shelf != self.request_queue[self.grid[_LAYER_AGENTS, y, x]]:
                 continue
             # a shelf was successfully delived.
             shelf_delivered = True
-            # remove from queue and replace it
-            new_request = np.random.choice(
-                list(set(self.shelfs) - set(self.request_queue))
-            )
-            self.request_queue[self.request_queue.index(shelf)] = new_request
+            # remove from queue
+            # Replace if request new
+            if self.layout["request_new"]:
+                new_request = np.random.choice(
+                    list(set(self.shelfs) - set(self.request_queue))
+                )
+                self.request_queue[self.request_queue.index(shelf)] = new_request
+            else:
+                self.request_queue[self.request_queue.index(shelf)] = -1
             # also reward the agents
             if self.reward_type == RewardType.GLOBAL:
                 rewards += 1
