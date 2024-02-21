@@ -607,6 +607,7 @@ class Warehouse(gym.Env):
                 if shelf_id:
                     agent.carrying_shelf = self.shelfs[shelf_id - 1]
             elif agent.req_action == Action.TOGGLE_LOAD and agent.carrying_shelf:
+                # TODO: add check for if shelf is in original location
                 if not self._is_highway(agent.x, agent.y):
                     agent.carrying_shelf = None
                     if agent.has_delivered and self.reward_type == RewardType.TWO_STAGE:
