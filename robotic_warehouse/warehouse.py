@@ -258,6 +258,9 @@ class Warehouse(gym.Env):
 
         self.renderer = None
 
+        # agent start and requested shelf locs
+        self.layout = layout
+
     def _use_slow_obs(self):
         self.fast_obs = False
         self.observation_space = spaces.Tuple(
@@ -468,14 +471,28 @@ class Warehouse(gym.Env):
         ]
 
         # spawn agents at random locations
-        agent_locs = np.random.choice(
-            np.arange(self.grid_size[0] * self.grid_size[1]),
-            size=self.n_agents,
-            replace=False,
-        )
+        # agent_locs is the 1d index of the grid the agent spawns
+
+        if self.layout is not None:
+            agent_locs = [
+                agent_init_loc[0] * self.grid_size[1] + agent_init_loc[1]
+                for agent_init_loc in self.layout["agent_loc"]
+            ]
+        else:
+            agent_locs = np.random.choice(
+                np.arange(self.grid_size[0] * self.grid_size[1]),
+                size=self.n_agents,
+                replace=False,
+            )
         agent_locs = np.unravel_index(agent_locs, self.grid_size)
         # and direction
-        agent_dirs = np.random.choice([d for d in Direction], size=self.n_agents)
+        if self.layout is not None:
+            agent_dirs = [
+                Direction(agent_init_loc[2]) for agent_init_loc in self.layout["agent_loc"]
+            ]
+        else:
+            agent_dirs = np.random.choice([d for d in Direction], size=self.n_agents)
+
         self.agents = [
             Agent(x, y, dir_, self.msg_bits)
             for y, x, dir_ in zip(*agent_locs, agent_dirs)
@@ -483,9 +500,16 @@ class Warehouse(gym.Env):
 
         self._recalc_grid()
 
-        self.request_queue = list(
-            np.random.choice(self.shelfs, size=self.request_queue_size, replace=False)
-        )
+        # goal shelves are made here
+        # option to fix loc by configuration
+        if self.layout is not None:
+            self.request_queue = [self.shelfs[shelf_ind] for shelf_ind in self.layout["requested_loc"]]
+        else:
+            self.request_queue = list(
+                np.random.choice(self.shelfs, size=self.request_queue_size, replace=False)
+            )
+
+        # TODO: need to add specific shelf for agent
 
         return tuple([self._make_obs(agent) for agent in self.agents])
         # for s in self.shelfs:
@@ -648,8 +672,7 @@ class Warehouse(gym.Env):
         if self.renderer:
             self.renderer.close()
 
-    def seed(self, seed=None):
-        ...
+    def seed(self, seed=None): ...
 
 
 if __name__ == "__main__":
