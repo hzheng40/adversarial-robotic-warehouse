@@ -403,7 +403,13 @@ class Warehouse(gym.Env):
                     obs.skip(2)
                 else:
                     obs.write(
-                        [1.0, int(self.shelfs[id_shelf - 1] == self.request_queue[id_agent])]
+                        [
+                            1.0,
+                            int(
+                                self.shelfs[id_shelf - 1]
+                                == self.request_queue[id_agent - 1]
+                            ),
+                        ]
                     )
 
             return obs.vector
@@ -488,7 +494,8 @@ class Warehouse(gym.Env):
         # and direction
         if self.layout is not None:
             agent_dirs = [
-                Direction(agent_init_loc[2]) for agent_init_loc in self.layout["agent_loc"]
+                Direction(agent_init_loc[2])
+                for agent_init_loc in self.layout["agent_loc"]
             ]
         else:
             agent_dirs = np.random.choice([d for d in Direction], size=self.n_agents)
@@ -503,13 +510,18 @@ class Warehouse(gym.Env):
         # goal shelves are made here
         # option to fix loc by configuration
         if self.layout is not None:
-            self.request_queue = [self.shelfs[shelf_ind] for shelf_ind in self.layout["requested_loc"]]
+            self.request_queue = [
+                self.shelfs[shelf_ind] for shelf_ind in self.layout["requested_loc"]
+            ]
         else:
             self.request_queue = list(
-                np.random.choice(self.shelfs, size=self.request_queue_size, replace=False)
+                np.random.choice(
+                    self.shelfs, size=self.request_queue_size, replace=False
+                )
             )
 
-        # TODO: need to add specific shelf for agent
+        # keep a copy of the original grid
+        self.original_grid = np.copy(self.grid)
 
         return tuple([self._make_obs(agent) for agent in self.agents])
         # for s in self.shelfs:
@@ -607,8 +619,13 @@ class Warehouse(gym.Env):
                 if shelf_id:
                     agent.carrying_shelf = self.shelfs[shelf_id - 1]
             elif agent.req_action == Action.TOGGLE_LOAD and agent.carrying_shelf:
-                # TODO: add check for if shelf is in original location
-                if not self._is_highway(agent.x, agent.y):
+                # check if shelf is in original location
+                shelf_id = self.grid[_LAYER_SHELFS, agent.y, agent.x]
+                drop_loc_id = self.original_grid[_LAYER_SHELFS, agent.y, agent.x]
+                if (
+                    not self._is_highway(agent.x, agent.y)
+                    and drop_loc_id == shelf_id
+                ):
                     agent.carrying_shelf = None
                     if agent.has_delivered and self.reward_type == RewardType.TWO_STAGE:
                         rewards[agent.id - 1] += 0.5
@@ -624,7 +641,10 @@ class Warehouse(gym.Env):
                 continue
             shelf = self.shelfs[shelf_id - 1]
 
-            if shelf not in self.request_queue or shelf != self.request_queue[self.grid[_LAYER_AGENTS, y, x]]:
+            if (
+                shelf not in self.request_queue
+                or shelf != self.request_queue[self.grid[_LAYER_AGENTS, y, x] - 1]
+            ):
                 continue
             # a shelf was successfully delived.
             shelf_delivered = True
