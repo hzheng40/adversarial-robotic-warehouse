@@ -79,6 +79,7 @@ class Agent(Entity):
         self.carrying_shelf: Optional[Shelf] = None
         self.canceled_action = None
         self.has_delivered = False
+        self.has_finished = False
 
     @property
     def collision_layers(self):
@@ -622,13 +623,11 @@ class Warehouse(gym.Env):
                 # check if shelf is in original location
                 shelf_id = self.grid[_LAYER_SHELFS, agent.y, agent.x]
                 drop_loc_id = self.original_grid[_LAYER_SHELFS, agent.y, agent.x]
-                if (
-                    not self._is_highway(agent.x, agent.y)
-                    and drop_loc_id == shelf_id
-                ):
+                if not self._is_highway(agent.x, agent.y) and drop_loc_id == shelf_id:
                     agent.carrying_shelf = None
                     if agent.has_delivered and self.reward_type == RewardType.TWO_STAGE:
                         rewards[agent.id - 1] += 0.5
+                        agent.has_finished = True
 
                     agent.has_delivered = False
 
@@ -674,17 +673,61 @@ class Warehouse(gym.Env):
             self._cur_inactive_steps += 1
         self._cur_steps += 1
 
-        if (
+        # if (
+        #     self.max_inactivity_steps
+        #     and self._cur_inactive_steps >= self.max_inactivity_steps
+        # ) or (self.max_steps and self._cur_steps >= self.max_steps):
+        #     dones = self.n_agents * [True]
+        #     done = True
+        # else:
+        #     dones = self.n_agents * [False]
+        #     done = False
+
+        # TODO: change check done conditons:
+        # 1. one agent has gotten reward 1
+        # 2. max step time out
+        # 3. should just be one done?
+
+        # TODO: also wrap rewards to zero sum?
+
+        # TODO: not ideal because checking float equality
+
+        done = False
+        # max step timeout
+        if self._cur_steps >= self.max_steps or (
             self.max_inactivity_steps
             and self._cur_inactive_steps >= self.max_inactivity_steps
-        ) or (self.max_steps and self._cur_steps >= self.max_steps):
-            dones = self.n_agents * [True]
+        ):
+            done = True
+            if rewards[0] == rewards[1]:
+                rewards = [0.0, 0.0]
+            elif rewards[0] == 0.5 and rewards[1] == 0.0:
+                rewards = [0.5, -0.5]
+            elif rewards[0] == 0.0 and rewards[1] == 0.5:
+                rewards = [-0.5, 0.5]
+        elif self.agents[0].has_finished and self.agents[1].has_finished:
+            # p1 and p2 wins at the same time
+            rewards = [0.0, 0.0]
+            done = True
+        elif self.agents[0].has_finished:
+            # p1 wins
+            rewards = [0.5, -0.5]
+            done = True
+        elif self.agents[1].has_finished:
+            # p2 wins
+            rewards = [-0.5, 0.5]
+            done = True
         else:
-            dones = self.n_agents * [False]
+            if rewards[0] == rewards[1]:
+                rewards = [0.0, 0.0]
+            elif rewards[0] == 0.5 and rewards[1] == 0.0:
+                rewards = [0.5, -0.5]
+            elif rewards[0] == 0.0 and rewards[1] == 0.5:
+                rewards = [-0.5, 0.5]
 
         new_obs = tuple([self._make_obs(agent) for agent in self.agents])
         info = {}
-        return new_obs, list(rewards), dones, info
+        return new_obs, list(rewards), done, info
 
     def render(self, mode="human"):
         if not self.renderer:
